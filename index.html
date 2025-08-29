@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <title>Notepad</title>
+  <!-- Tailwind CDN for base utilities -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    /* Theme variables — this overrides Tailwind utilities using IDs for reliability */
+    :root{
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --muted: #6b7280;
+      --input-bg: #f9fafb;
+      --accent: #3b82f6;
+    }
+    html.theme-dark{
+      --bg: #181a1b;
+      --card-bg: #202324;
+      --text: #d1d5db;
+      --muted: #6b7280;
+      --input-bg: #23272a;
+      --accent: #4f8cff;
+    }
+
+    /* Override visuals (placed after Tailwind link so it wins) */
+    body{ background-color:var(--bg) !important; color:var(--text) !important; }
+    #card{ background-color:var(--card-bg) !important; color:var(--text) !important; }
+    #textbox, #promptbox{
+      background-color:var(--input-bg) !important;
+      color:var(--text) !important;
+      border-radius: 18px !important;
+      border-width: 1px !important;
+      border-style: solid !important;
+      border-color: #DDDDDD !important;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    #textbox:focus, #promptbox:focus{
+      box-shadow:0 0 0 2px var(--muted);
+      border-color: var(--muted) !important;
+      outline: none !important;
+    }
+    .counts{ color:var(--muted) !important; }
+    /* Small nicety for the toggle button */
+    #toggleMode{ background:transparent; border:1px solid color-mix(in srgb,var(--muted) 30%, transparent); color:var(--text); padding:.4rem .6rem; border-radius:8px }
+    html.theme-dark #textbox, html.theme-dark #promptbox {
+      border-color: #23272a !important;
+    }
+    html.theme-dark #card {
+      border: none !important;
+    }
+    #saveBtn {
+      background: var(--input-bg) !important;
+      color: var(--text) !important;
+      border-radius: 18px !important;
+      border-width: 1px !important;
+      border-style: solid !important;
+      border-color: color-mix(in srgb, var(--muted) 30%, transparent) !important;
+      transition: box-shadow 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    #saveBtn:hover, #saveBtn:focus {
+      background: var(--accent) !important;
+      color: #fff !important;
+      border-color: var(--accent) !important;
+    }
+    html.theme-dark #saveBtn:hover, html.theme-dark #saveBtn:focus {
+      background: var(--accent) !important;
+      color: #fff !important;
+      border-color: var(--accent) !important;
+    }
+    #saveBtn svg {
+      stroke: var(--muted);
+      stroke-width: 1.2;
+      transition: stroke 0.15s;
+    }
+    #saveBtn:hover svg, #saveBtn:focus svg, html.theme-dark #saveBtn:hover svg, html.theme-dark #saveBtn:focus svg {
+      stroke: #fff !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4" style="height: 100vh;">
+  <div id="card" class="w-full max-w-3xl p-6 rounded-2xl shadow-lg flex flex-col justify-between" style="height: 90vh;">
+    <div class="mb-4">
+      <textarea id="promptbox" class="w-full h-24 p-4 rounded-lg border resize-none" placeholder="Paste prompt"></textarea>
+    </div>
+
+    <div class="flex-1 flex flex-col min-h-0">
+      <textarea id="textbox" class="w-full flex-1 min-h-0 p-4 rounded-lg border resize-none" placeholder="Start writing" style="resize: none;"></textarea>
+      <div class="flex justify-between mt-3 counts">
+        <div class="flex-1 flex items-center justify-start min-w-0">
+          <span id="wordCount" class="truncate">Words: 0</span>
+        </div>
+        <div class="flex-1 flex items-center justify-center min-w-0">
+          <button id="saveBtn" class="counts text-sm" style="background:transparent; border:1px solid color-mix(in srgb,var(--muted) 30%, transparent); color:var(--text); padding:.4rem .6rem; border-radius:8px; font-size:1rem; min-width:2.5rem; min-height:2.5rem; display:flex; align-items:center; justify-content:center;" title="Save as .txt">
+            &#x2276;&#x2227;&#x2228;&#x2208;
+        </button>
+        </div>
+        <div class="flex-1 flex items-center justify-end min-w-0">
+          <span id="charCount" class="truncate">Characters: 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const promptbox = document.getElementById('promptbox');
+    const textarea = document.getElementById('textbox');
+    const wordCountSpan = document.getElementById('wordCount');
+    const charCountSpan = document.getElementById('charCount');
+    const saveBtn = document.getElementById('saveBtn');
+    const docEl = document.documentElement;
+
+    // Robust Unicode-aware word counting
+    function countWords(str){
+      if (!str) return 0;
+      const matches = str.trim().match(/\p{L}[\p{L}\p{N}'’\-]*/gu);
+      return matches ? matches.length : 0;
+    }
+
+    function updateCounts(){
+      const text = textarea.value || '';
+      const words = countWords(text);
+      const chars = text.length;
+      wordCountSpan.textContent = `${words}`;
+      charCountSpan.textContent = `${chars}`;
+    }
+
+    textarea.addEventListener('input', updateCounts);
+    updateCounts();
+
+    // Remove theme toggle and always follow system theme
+    function applySystemTheme(){
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        docEl.classList.add('theme-dark');
+      } else {
+        docEl.classList.remove('theme-dark');
+      }
+    }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applySystemTheme);
+    applySystemTheme();
+
+    // Save as .txt functionality
+    saveBtn.addEventListener('click', () => {
+      const prompt = promptbox.value || '';
+      const text = textarea.value || '';
+      const words = countWords(text);
+      const chars = text.length;
+      let content = '';
+      if (prompt.trim()) {
+        content += 'Prompt: ' + prompt.trim() + '\n\n';
+      }
+      content += `Words: ${words}, Characters: ${chars}\n\n`;
+      content += text;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'notepad.txt';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+    });
+  </script>
+</body>
+</html>
